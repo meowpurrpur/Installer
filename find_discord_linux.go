@@ -100,6 +100,70 @@ func ParseDiscord(p, _ string) *DiscordInstall {
 	}
 }
 
+func FindLatestAppDir(base string) string {
+	children, err := os.ReadDir(base)
+	if err != nil {
+		return ""
+	}
+
+	var latest string
+	var latestVer []int
+
+	for _, child := range children {
+		name := child.Name()
+		if !child.IsDir() || !strings.HasPrefix(name, "app-") {
+			continue
+		}
+
+		verStr := strings.TrimPrefix(name, "app-")
+		parts := strings.Split(verStr, ".")
+		var ver []int
+
+		for _, p := range parts {
+			n, err := strconv.Atoi(p)
+			if err != nil {
+				n = 0
+			}
+			ver = append(ver, n)
+		}
+
+		if latest == "" || CompareAppVersions(ver, latestVer) > 0 {
+			latest = name
+			latestVer = ver
+		}
+	}
+
+	if latest == "" {
+		return ""
+	}
+
+	return path.Join(base, latest)
+}
+
+func CompareAppVersions(a, b []int) int {
+	l := len(a)
+	if len(b) > l {
+		l = len(b)
+	}
+
+	for i := 0; i < l; i++ {
+		ai, bi := 0, 0
+		if i < len(a) {
+			ai = a[i]
+		}
+		if i < len(b) {
+			bi = b[i]
+		}
+		if ai > bi {
+			return 1
+		}
+		if ai < bi {
+			return -1
+		}
+	}
+	return 0
+}
+
 func FindDiscords() []any {
 	var discords []any
 	for _, dir := range DiscordDirs {
@@ -120,6 +184,28 @@ func FindDiscords() []any {
 			discordDir := path.Join(dir, name)
 			if discord := ParseDiscord(discordDir, ""); discord != nil {
 				Log.Debug("Found Discord install at ", discordDir)
+				discords = append(discords, discord)
+			}
+		}
+	}
+
+	configBase := path.Join(Home, ".config")
+	configDirs, err := os.ReadDir(configBase)
+	if err == nil {
+		for _, child := range configDirs {
+			name := child.Name()
+			if !child.IsDir() || !SliceContains(LinuxDiscordNames, name) {
+				continue
+			}
+
+			base := path.Join(configBase, name)
+			appDir := FindLatestAppDir(base)
+			if appDir == "" {
+				continue
+			}
+
+			if discord := ParseDiscord(appDir, ""); discord != nil {
+				Log.Debug("Found Discord install at ", appDir)
 				discords = append(discords, discord)
 			}
 		}
