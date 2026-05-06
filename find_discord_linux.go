@@ -65,11 +65,17 @@ func init() {
 func ParseDiscord(p, _ string) *DiscordInstall {
 	name := path.Base(p)
 
+	if strings.HasPrefix(name, "app-") {
+		parent := path.Base(path.Dir(p))
+		if parent != "." && parent != "/" {
+			name = parent
+		}
+	}
+
 	needsFlatpakResolve := strings.Contains(p, "/flatpak/") && !strings.Contains(p, "/current/active/files/")
 	if needsFlatpakResolve {
 		discordName := strings.ToLower(name[len("com.discordapp."):])
-		if discordName != "discord" { //
-			// DiscordCanary -> discord-canary
+		if discordName != "discord" {
 			discordName = discordName[:7] + "-" + discordName[7:]
 		}
 		p = path.Join(p, "current/active/files", discordName)
@@ -80,9 +86,9 @@ func ParseDiscord(p, _ string) *DiscordInstall {
 
 	isPatched, isSystemElectron := false, false
 
-	if ExistsFile(resources) { // normal install
+	if ExistsFile(resources) {
 		isPatched = ExistsFile(path.Join(resources, "_app.asar"))
-	} else if ExistsFile(path.Join(p, "app.asar")) { // System electron doesn't have resources folder
+	} else if ExistsFile(path.Join(p, "app.asar")) {
 		isSystemElectron = true
 		isPatched = ExistsFile(path.Join(p, "_app.asar.unpacked"))
 	} else {
